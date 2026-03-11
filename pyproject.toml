@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "azure-identity>=1.25.2",
+    "ipykernel>=7.2.0",
     "openai>=2.26.0",
     "openpyxl>=3.1.5",
     "pandas>=2.0.0",
