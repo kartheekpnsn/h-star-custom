@@ -75,7 +75,7 @@ class Generator:
                         {"role": "user", "content": prompt}
                     ],
                     temperature=temp,
-                    max_tokens=tokens
+                    # max_tokens=tokens
                 )
                 
                 return response.choices[0].message.content.strip()
@@ -116,7 +116,7 @@ class Generator:
                 {"role": "user", "content": prompt}
             ],
             temperature=temp,
-            max_tokens=tokens
+            # max_tokens=tokens
         )
         
         return {
