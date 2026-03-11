@@ -1,0 +1,56 @@
+categories:
+  - name: performance_trends # High-level metrics regarding drug volume, market share, and growth over time.
+    parameters:
+      - time_grain
+      - geography
+      - patient_type
+      - shipment_details
+
+  - name: patient_dynamics # Analyzing the split between New (N) and Refill (R) patients and their behavior.
+    parameters:
+      - patient_type
+
+  - name: prescriber_insights # Identifying who is writing the scripts and how their behavior is changing.
+    parameters:
+      - geography
+
+  - name: operational_friction # Understanding TAT (Turnaround Time).
+    parameters:
+      - shipment_details
+
+  - name: comparative_analysis # Comparing performance across different drugs.
+    parameters:
+      - geography
+      - patient_type
+      - shipment_details
+
+  - name: prescriptive_actions # For the "What actions should I take" questions
+    parameters:
+      - shipment_details
+      - patient_type
+      - geography
+
+parameters:
+  time_grain:
+    - Week
+    - Month
+    - 6 Months
+    - Year
+
+  geography:
+    - Patient State
+    - Prescriber State
+
+  patient_type:
+    - New Patients
+    - Refill Patients
+    - Unique Patients
+
+  payer_info:
+    - Payer Name
+    - Payer Type
+
+  shipment_details:
+    - Total Shipments
+    - Average Shipment Quantity
+    - Average Turnaround Time
