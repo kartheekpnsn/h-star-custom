@@ -27,7 +27,7 @@ class Config:
     
     # Result settings
     results_dir: str = "results"
-    save_intermediate: bool = False
+    save_intermediate: bool = True
     
     # Database settings
     db_path: str = ":memory:"
