@@ -32,6 +32,7 @@ def main():
         results = hstar.run_from_csv(
             csv_path=CSV_PATH,
             question=DEFAULT_QUESTION,
+            save_results=False  # Set to True to save final results
         )
         
         # Print summary
