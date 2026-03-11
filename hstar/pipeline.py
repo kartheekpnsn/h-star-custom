@@ -1,6 +1,7 @@
 """Main H-STAR pipeline orchestrator."""
 
 import os
+import sqlite3
 import pandas as pd
 from typing import Dict, Any, Optional
 from pathlib import Path
@@ -41,6 +42,7 @@ class HStar:
         """
         self.config = config or Config.from_env()
         self.generator = Generator(self.config)
+        self._source_table: Optional[pd.DataFrame] = None
         
         # Initialize stages
         self.stages = [
@@ -56,41 +58,81 @@ class HStar:
         if self.config.save_intermediate:
             Path(self.config.results_dir).mkdir(parents=True, exist_ok=True)
     
+    def load_data(
+        self,
+        csv_path: Optional[str] = None,
+        db_path: Optional[str] = None,
+    ) -> None:
+        """
+        Load table data once from an existing SQLite DB or CSV file.
+
+        The loaded DataFrame is cached internally so that subsequent
+        ``run()`` calls can create lightweight in-memory copies without
+        re-reading the source.
+
+        Args:
+            csv_path: Path to a CSV file.
+            db_path:  Path to an existing SQLite database file.
+                      Takes precedence over *csv_path* when both are given.
+        """
+        if db_path:
+            conn = sqlite3.connect(db_path)
+            self._source_table = pd.read_sql_query(
+                f"SELECT * FROM {self.config.table_name}", conn
+            )
+            conn.close()
+            print(f"Loaded table from DB: {db_path} (shape: {self._source_table.shape})")
+        elif csv_path:
+            self._source_table = pd.read_csv(csv_path)
+            print(f"Loaded table from CSV: {csv_path} (shape: {self._source_table.shape})")
+        else:
+            raise ValueError("Either csv_path or db_path must be provided")
+
     def run(
         self,
-        table: pd.DataFrame,
         question: str,
+        table: Optional[pd.DataFrame] = None,
         save_results: bool = True
     ) -> Dict[str, Any]:
         """
         Run the full H-STAR pipeline.
         
+        Uses cached data from ``load_data()`` when *table* is not supplied.
+        Each call creates a fresh in-memory NeuralDB copy so the source
+        data is never mutated.
+
         Args:
-            table: Input table as pandas DataFrame
             question: Question to answer about the table
+            table: Input table as pandas DataFrame (optional if load_data was called)
             save_results: Whether to save intermediate results
             
         Returns:
             Dictionary with final answer and all intermediate results
         """
+        source = table if table is not None else self._source_table
+        if source is None:
+            raise ValueError(
+                "No table data available. Call load_data() first or pass a table."
+            )
+
         print("\n" + "="*60)
         print("H-STAR PIPELINE EXECUTION")
         print("="*60)
         print(f"Question: {question}")
-        print(f"Table shape: {table.shape}")
+        print(f"Table shape: {source.shape}")
         print("="*60 + "\n")
         
-        # Initialize database
+        # Create a fresh in-memory NeuralDB copy for this query
         db = NeuralDB(
-            table=table,
-            db_path=self.config.db_path,
+            table=source.copy(),
+            db_path=":memory:",
             table_name=self.config.table_name
         )
         
         # Execute stages sequentially
         all_results = {
             "question": question,
-            "table_shape": table.shape,
+            "table_shape": source.shape,
             "stages": {}
         }
         
@@ -157,6 +199,9 @@ class HStar:
     ) -> Dict[str, Any]:
         """
         Run pipeline on a CSV file.
+
+        Loads the data once (preferring an existing DB in ``db/``) and
+        caches it for future calls.
         
         Args:
             csv_path: Path to CSV file
@@ -166,10 +211,12 @@ class HStar:
         Returns:
             Dictionary with final answer and all intermediate results
         """
-        # Load CSV
-        print(f"Loading CSV from: {csv_path}")
-        table = pd.read_csv(csv_path)
-        print(f"Loaded table with shape: {table.shape}")
+        if self._source_table is None:
+            # Prefer existing DB file over re-reading CSV
+            db_file = str(Path("db") / f"{Path(csv_path).stem}.db")
+            if os.path.exists(db_file):
+                self.load_data(db_path=db_file)
+            else:
+                self.load_data(csv_path=csv_path)
         
-        # Run pipeline
-        return self.run(table, question, save_results)
+        return self.run(question=question, save_results=save_results)
