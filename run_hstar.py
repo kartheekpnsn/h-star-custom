@@ -15,6 +15,7 @@ def main():
     DEFAULT_QUESTION = "What is the population of France?"
     CSV_PATH = "data/titanic.csv"
     DEFAULT_QUESTION = "Which gender survived more on the Titanic, and what was the average age of survivors?"
+    DEFAULT_QUESTION = "Why did female passengers have a higher survival rate?"
     
     # Create configuration
     try:
