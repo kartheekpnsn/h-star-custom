@@ -46,11 +46,18 @@ class Config:
             raise ValueError("AZURE_OPENAI_DEPLOYMENT must be set in .env or passed to Config")
     
     @classmethod
-    def from_env(cls) -> "Config":
+    def from_env(cls, model_name: str="gpt-4o") -> "Config":
         """Create configuration from environment variables."""
         load_dotenv()
+        return cls.load_gpt_config(model_name)
+    
+    @classmethod
+    def load_gpt_config(cls, model_name: str) -> "Config":
+        """Load configuration with settings optimized for GPT models."""
+        model_version = model_name.lower().split("-")[1] # gpt-4.1, gpt-5.4, etc.
+        model_version = model_version.replace(".", "").upper() # Remove dots for easier comparison
         return cls(
-            azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT", ""),
-            azure_deployment=os.getenv("AZURE_OPENAI_DEPLOYMENT", ""),
-            azure_api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-02-15-preview"),
+            azure_endpoint=os.getenv(f"AZURE_OPENAI_{model_version}_ENDPOINT", ""),
+            azure_deployment=os.getenv(f"AZURE_OPENAI_{model_version}_DEPLOYMENT", ""),
+            azure_api_version=os.getenv(f"AZURE_OPENAI_{model_version}_API_VERSION", "2024-12-01-preview"),
         )
