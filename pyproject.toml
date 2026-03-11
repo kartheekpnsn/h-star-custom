@@ -12,9 +12,10 @@ dependencies = [
     "pandas>=2.0.0",
     "pyclean>=3.5.0",
     "python-dotenv>=1.2.2",
-
     # Agent Framework (Challenge 02)
     "agent-framework==1.0.0rc2",
+    "seaborn>=0.13.2",
+    "scipy>=1.15.3",
 ]
 
 [tool.uv]
