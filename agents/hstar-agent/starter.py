@@ -29,14 +29,17 @@ from hstar import HStar, Config
 # Initialize H-STAR pipeline once at module level
 # ---------------------------------------------------------------------------
 _model_name = os.environ.get("HSTAR_MODEL_NAME", "gpt-5.1")
-_csv_path = os.environ.get("HSTAR_CSV_PATH", "data/titanic.csv")
+_db_path = os.environ.get("HSTAR_DB_PATH", "db/drug_shipments_200.db")
 
-# Resolve CSV path relative to project root
+# Resolve DB path relative to project root
 _project_root = os.path.join(os.path.dirname(__file__), "..", "..")
-_csv_full_path = os.path.normpath(os.path.join(_project_root, _csv_path))
+_db_full_path = os.path.normpath(os.path.join(_project_root, _db_path))
 
 _config = Config.from_env(model_name=_model_name)
 _hstar = HStar(_config)
+
+# Load data once from DB
+_hstar.load_data(db_path=_db_full_path)
 
 
 # ---------------------------------------------------------------------------
@@ -56,8 +59,7 @@ def ask_table_question(question: str) -> str:
                   "What was the average age of survivors?",
                   "Which class had the highest survival rate?"
     """
-    results = _hstar.run_from_csv(
-        csv_path=_csv_full_path,
+    results = _hstar.run(
         question=question,
         save_results=False,
     )
@@ -69,7 +71,7 @@ def ask_table_question(question: str) -> str:
 # ---------------------------------------------------------------------------
 HSTAR_INSTRUCTIONS = (
     f"You are the H-STAR Table Reasoning Agent. You help users analyze tabular data "
-    f"by answering questions about the dataset loaded from '{_csv_path}'.\n\n"
+    f"by answering questions about the dataset loaded from '{_db_path}'.\n\n"
     "When a user asks a question about the data, use the ask_table_question tool "
     "to run the H-STAR pipeline and get the answer. Present the answer clearly.\n\n"
     "If the user asks a general question not related to the dataset, answer it "
@@ -96,7 +98,7 @@ def main() -> None:
         tools=[ask_table_question],
     )
 
-    print(f"H-STAR Agent ready — dataset: {_csv_full_path}")
+    print(f"H-STAR Agent ready — dataset: {_db_full_path}")
     print(f"Model: {_model_name}")
     print("Starting DevUI on http://localhost:8080 ...")
     serve(entities=[agent], port=8080, auto_open=True)
