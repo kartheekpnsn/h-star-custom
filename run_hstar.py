@@ -11,6 +11,7 @@ from hstar import HStar, Config
 def main():
     """Main CLI entry point."""
 
+    MODEL_NAME = "gpt-5.4"  # Change to your desired model
     CSV_PATH = "data/sample_table.csv"
     DEFAULT_QUESTION = "What is the population of France?"
     CSV_PATH = "data/titanic.csv"
@@ -19,7 +20,7 @@ def main():
     
     # Create configuration
     try:
-        config = Config.from_env()
+        config = Config.from_env(model_name=MODEL_NAME)
     except ValueError as e:
         print(f"Configuration error: {e}")
         print("\nMake sure you have set AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_DEPLOYMENT")
