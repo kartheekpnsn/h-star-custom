@@ -155,3 +155,110 @@ class PromptBuilder:
         prompt += "Output:"
         
         return prompt
+
+
+if __name__ == "__main__":
+    """Test PromptBuilder with Titanic dataset."""
+    from pathlib import Path
+    
+    print("=" * 80)
+    print("Testing PromptBuilder with Titanic Dataset")
+    print("=" * 80)
+    
+    # Load Titanic CSV
+    csv_path = Path("data/titanic.csv")
+    if not csv_path.exists():
+        print(f"Error: {csv_path} not found!")
+        exit(1)
+    
+    df = pd.read_csv(csv_path)
+    print(f"\n✓ Loaded dataset with {len(df)} rows and {len(df.columns)} columns")
+    print(f"Columns: {', '.join(df.columns.tolist())}\n")
+    
+    # Create NeuralDB instance
+    db = NeuralDB(df)
+    
+    # Test different prompt styles
+    styles = ["create_table", "transpose", "text"]
+    
+    for style in styles:
+        print("\n" + "=" * 80)
+        print(f"Testing Prompt Style: {style}")
+        print("=" * 80)
+        
+        builder = PromptBuilder(prompt_style=style, max_rows=10)
+        formatted_table = builder.format_table(db)
+        
+        print(formatted_table)
+        print(f"\n✓ Generated {style} formatted table ({len(formatted_table)} characters)")
+    
+    # Test build_simple_prompt
+    print("\n" + "=" * 80)
+    print("Testing build_simple_prompt()")
+    print("=" * 80)
+    
+    builder = PromptBuilder(prompt_style="create_table")
+    table_str = builder.format_table(db)
+    
+    simple_prompt = builder.build_simple_prompt(
+        instruction="Analyze the following table and answer the question.",
+        table=table_str,
+        question="What was the survival rate for passengers in first class?",
+        context="Focus on the 'Survived' and 'Pclass' columns."
+    )
+    
+    print(simple_prompt)
+    print(f"\n✓ Generated simple prompt ({len(simple_prompt)} characters)")
+    
+    # Test build_prompt_with_examples
+    print("\n" + "=" * 80)
+    print("Testing build_prompt_with_examples()")
+    print("=" * 80)
+    
+    # Create mock examples
+    example_table = """CREATE TABLE passengers (
+  Name TEXT,
+  Age INTEGER,
+  Fare REAL
+);
+
+Sample rows:
+  ('John Doe', 25, 50.0)
+  ('Jane Smith', 30, 75.5)"""
+    
+    examples = [
+        {
+            "table": example_table,
+            "question": "What was the average age?",
+            "output": "SELECT AVG(Age) FROM passengers;"
+        },
+        {
+            "table": example_table,
+            "question": "Who paid the highest fare?",
+            "output": "SELECT Name FROM passengers ORDER BY Fare DESC LIMIT 1;"
+        }
+    ]
+    
+    few_shot_prompt = builder.build_prompt_with_examples(
+        template="Generate a SQL query to answer the question based on the table.",
+        examples=examples,
+        current_table=table_str,
+        current_question="How many passengers were there in total?"
+    )
+    
+    print(few_shot_prompt[:500] + "...")  # Print first 500 chars
+    print(f"\n✓ Generated few-shot prompt ({len(few_shot_prompt)} characters)")
+    
+    # Test with different max_rows settings
+    print("\n" + "=" * 80)
+    print("Testing max_rows parameter")
+    print("=" * 80)
+    
+    for max_rows in [5, 10, 20]:
+        builder = PromptBuilder(prompt_style="create_table", max_rows=max_rows)
+        formatted = builder.format_table(db)
+        print(f"max_rows={max_rows}: {len(formatted)} characters")
+    
+    print("\n" + "=" * 80)
+    print("✓ All tests completed successfully!")
+    print("=" * 80)
