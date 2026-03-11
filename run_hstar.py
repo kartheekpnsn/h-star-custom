@@ -12,8 +12,6 @@ def main():
     """Main CLI entry point."""
 
     MODEL_NAME = "gpt-5.4"  # Change to your desired model
-    CSV_PATH = "data/sample_table.csv"
-    DEFAULT_QUESTION = "What is the population of France?"
     CSV_PATH = "data/titanic.csv"
     DEFAULT_QUESTION = "Which gender survived more on the Titanic, and what was the average age of survivors?"
     DEFAULT_QUESTION = "Why did female passengers have a higher survival rate?"
