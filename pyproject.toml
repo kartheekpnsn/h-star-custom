@@ -1,0 +1,16 @@
+[project]
+name = "hstar"
+version = "0.1.0"
+description = "H-STAR: LLM-driven Hybrid SQL-Text Adaptive Reasoning on Tables"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "azure-identity>=1.25.2",
+    "openai>=2.26.0",
+    "openpyxl>=3.1.5",
+    "pandas>=2.0.0",
+    "python-dotenv>=1.2.2",
+]
+
+[project.scripts]
+hstar = "run_hstar:main"
