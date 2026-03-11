@@ -10,6 +10,7 @@ dependencies = [
     "openai>=2.26.0",
     "openpyxl>=3.1.5",
     "pandas>=2.0.0",
+    "pyclean>=3.5.0",
     "python-dotenv>=1.2.2",
 ]
 
