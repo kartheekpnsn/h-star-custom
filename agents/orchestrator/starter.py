@@ -42,6 +42,7 @@ from agent_framework.orchestrations import SequentialBuilder
 
 from prompt_builder import PromptBuilder
 from hstar import HStar, Config
+from agents.instructions.instructions import HSTAR_INSTRUCTIONS, MQA_INSTRUCTIONS
 
 # ---------------------------------------------------------------------------
 # Shared singletons
@@ -52,10 +53,22 @@ _builder = PromptBuilder(_config_path)
 _model_name = os.environ.get("HSTAR_MODEL_NAME", "gpt-4.1")
 _db_path = os.environ.get("HSTAR_DB_PATH", "db/drug_shipments_200.db")
 _db_full_path = os.path.normpath(os.path.join(_project_root, _db_path))
+_column_desc_path = os.environ.get("HSTAR_COLUMN_DESC_PATH", "data/drug_shipments_200_meta.md")
+_column_desc_full_path = os.path.normpath(os.path.join(_project_root, _column_desc_path))
 
 _hstar_config = Config.from_env(model_name=_model_name)
+_hstar_config.save_intermediate = False  # Don't save intermediate results for each tool call to reduce overhead
 _hstar = HStar(_hstar_config)
 _hstar.load_data(db_path=_db_full_path)
+
+# Load the markdown column description if it exists
+column_desc = None
+if os.path.exists(_column_desc_full_path):
+    with open(_column_desc_full_path, 'r') as f:
+        column_desc = f.read()
+        print(f"Loaded column description from {_column_desc_full_path}")
+else:
+    print(f"Warning: Column description file not found at {_column_desc_full_path}. Continuing without it.")
 
 # =====================================================================
 # MQA tools
@@ -116,7 +129,7 @@ def ask_table_questions_batch(questions: List[str]) -> str:
     results: dict = {}
 
     def _run_one(q: str) -> tuple:
-        answer = _hstar.run(question=q, save_results=False)
+        answer = _hstar.run(question=q, column_desc=column_desc, save_results=False)
         return q, answer.get("final_answer", "No answer generated.")
 
     with ThreadPoolExecutor(max_workers=min(len(questions), 5)) as pool:
@@ -126,36 +139,6 @@ def ask_table_questions_batch(questions: List[str]) -> str:
             results[q] = answer
 
     return json.dumps(results, indent=2)
-
-
-# =====================================================================
-# H-STAR Agent instructions
-# =====================================================================
-HSTAR_INSTRUCTIONS = (
-    f"You are the H-STAR Table Reasoning Agent. You help users analyze tabular data "
-    f"by answering questions about the dataset loaded from '{_db_path}'.\n\n"
-    "When you receive sub-queries from the MQA Agent, use ask_table_questions_batch "
-    "to answer them all in parallel. Then synthesise the sub-answers into a "
-    "comprehensive, well-structured final response grouped by dimension.\n\n"
-    "If the user asks a general question not related to the dataset, answer it "
-    "directly without using the tool."
-)
-
-# =====================================================================
-# MQA Agent instructions
-# =====================================================================
-MQA_INSTRUCTIONS = (
-    "You are a Multi-Query Agent designed to help expand user queries into multiple sub-queries based on predefined categories and parameters. "
-    "Your goal is to identify relevant categories for a given user query, extract associated parameters, and generate sub-queries that can be used to retrieve data from a database.\n\n"
-    "Steps to follow:\n"
-    "1. Analyze the user query and determine which categories from the provided list are relevant. You can select multiple categories if applicable.\n"
-    "2. For each selected category, identify the associated parameters and their possible values from the configuration.\n"
-    "3. Generate multiple sub-queries that combine the user query with the selected categories and parameters. Each sub-query should be a valid question that could be asked to a database or search engine.\n\n"
-    "Use the following tools to assist you:\n"
-    "- get_available_categories: Returns the list of available categories and their parameters.\n"
-    "- get_parameters_for_categories: Given a list of categories, returns the associated parameters and their values.\n\n"
-    "Make sure to provide clear and concise sub-queries that cover different aspects of the user's original query based on the selected categories and parameters."
-)
 
 # =====================================================================
 # Entrypoint
@@ -179,7 +162,7 @@ def main() -> None:
     hstar_agent = Agent(
         name="hstar",
         client=client,
-        instructions=HSTAR_INSTRUCTIONS,
+        instructions=HSTAR_INSTRUCTIONS.format(_db_path=_db_path),
         tools=[ask_table_questions_batch],
     )
 
@@ -194,6 +177,7 @@ def main() -> None:
         entities=[mqa_agent, hstar_agent, workflow, sequential_agent],
         port=8080,
         auto_open=True,
+        instrumentation_enabled=True,
     )
 
 
