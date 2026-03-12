@@ -34,7 +34,6 @@ parameters:
   time_grain:
     - Week
     - Month
-    - 6 Months
     - Year
 
   geography:
