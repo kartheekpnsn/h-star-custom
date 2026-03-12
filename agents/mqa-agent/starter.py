@@ -33,6 +33,7 @@ sys.path.insert(0, _project_root)
 sys.path.insert(0, _mqa_dir)
 
 from prompt_builder import PromptBuilder
+from agents.instructions.instructions import MQA_INSTRUCTIONS
 
 _config_path = os.path.join(_mqa_dir, "config.yaml")
 _builder = PromptBuilder(_config_path)
@@ -72,24 +73,6 @@ def get_parameters_for_categories(categories: List[str]) -> str:
                     parameter_dict[param] = config["parameters"][param]
     return json.dumps(parameter_dict)
 
-
-# ---------------------------------------------------------------------------
-# Agent instructions
-# ---------------------------------------------------------------------------
-MQA_INSTRUCTIONS = (
-    "You are a Multi-Query Agent designed to help expand user queries into multiple sub-queries based on predefined categories and parameters. "
-    "Your goal is to identify relevant categories for a given user query, extract associated parameters, and generate sub-queries that can be used to retrieve data from a database.\n\n"
-    "Steps to follow:\n"
-    "1. Analyze the user query and determine which categories from the provided list are relevant. You can select multiple categories if applicable.\n"
-    "2. For each selected category, identify the associated parameters and their possible values from the configuration.\n"
-    "3. Generate multiple sub-queries that combine the user query with the selected categories and parameters. Each sub-query should be a valid question that could be asked to a database or search engine.\n\n"
-    "Use the following tools to assist you:\n"
-    "- get_available_categories: Returns the list of available categories and their parameters.\n"
-    "- get_parameters_for_categories: Given a list of categories, returns the associated parameters and their values.\n\n"
-    "Make sure to provide clear and concise sub-queries that cover different aspects of the user's original query based on the selected categories and parameters."
-)
-
-
 # ---------------------------------------------------------------------------
 # Create agent and serve via DevUI
 # ---------------------------------------------------------------------------
@@ -109,7 +92,7 @@ def main() -> None:
 
     print(f"Multi-Query Agent ready")
     print("Starting DevUI on http://localhost:8080 ...")
-    serve(entities=[agent], port=8080, auto_open=True)
+    serve(entities=[agent], port=8080, auto_open=True, instrumentation_enabled=True)
 
 
 if __name__ == "__main__":
