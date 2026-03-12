@@ -23,6 +23,7 @@ from azure.identity import DefaultAzureCredential
 from agent_framework.azure import AzureOpenAIResponsesClient
 from agent_framework.devui import serve
 from hstar import HStar, Config
+from agents.instructions.instructions import HSTAR_INSTRUCTIONS
 
 
 # ---------------------------------------------------------------------------
@@ -30,12 +31,25 @@ from hstar import HStar, Config
 # ---------------------------------------------------------------------------
 _model_name = os.environ.get("HSTAR_MODEL_NAME", "gpt-5.1")
 _db_path = os.environ.get("HSTAR_DB_PATH", "db/drug_shipments_200.db")
+_column_desc_path = os.environ.get("HSTAR_COLUMN_DESC_PATH", "data/drug_shipments_200_meta.md")
 
 # Resolve DB path relative to project root
 _project_root = os.path.join(os.path.dirname(__file__), "..", "..")
 _db_full_path = os.path.normpath(os.path.join(_project_root, _db_path))
+_column_desc_full_path = os.path.normpath(os.path.join(_project_root, _column_desc_path))
+
+# Load the markdown column description if it exists
+column_desc = None
+if os.path.exists(_column_desc_full_path):
+    with open(_column_desc_full_path, 'r') as f:
+        column_desc = f.read()
+        print(f"Loaded column description from {_column_desc_full_path}")
+else:
+    print(f"Warning: Column description file not found at {_column_desc_full_path}. Continuing without it.")
+
 
 _config = Config.from_env(model_name=_model_name)
+_config.save_intermediate = False  # Don't save intermediate results for each tool call to reduce overhead
 _hstar = HStar(_config)
 
 # Load data once from DB
@@ -61,25 +75,10 @@ def ask_table_question(question: str) -> str:
     """
     results = _hstar.run(
         question=question,
+        column_desc=column_desc,
         save_results=False,
     )
     return results.get("final_answer", "No answer generated.")
-
-
-# ---------------------------------------------------------------------------
-# Agent instructions
-# ---------------------------------------------------------------------------
-HSTAR_INSTRUCTIONS = (
-    f"You are the H-STAR Table Reasoning Agent. You help users analyze tabular data "
-    f"by answering questions about the dataset loaded from '{_db_path}'.\n\n"
-    "When a user asks a question about the data, use the ask_table_question tool "
-    "to run the H-STAR pipeline and get the answer. Present the answer clearly.\n\n"
-    "If the user asks a general question not related to the dataset, answer it "
-    "directly without using the tool.\n\n"
-    "You can handle follow-up questions — each tool call runs the full pipeline "
-    "independently, so rephrase follow-ups as standalone questions when calling the tool."
-)
-
 
 # ---------------------------------------------------------------------------
 # Create agent and serve via DevUI
@@ -94,14 +93,14 @@ def main() -> None:
     agent = Agent(
         name="hstar",
         client=client,
-        instructions=HSTAR_INSTRUCTIONS,
+        instructions=HSTAR_INSTRUCTIONS.format(_db_path=_db_path),
         tools=[ask_table_question],
     )
 
     print(f"H-STAR Agent ready — dataset: {_db_full_path}")
     print(f"Model: {_model_name}")
     print("Starting DevUI on http://localhost:8080 ...")
-    serve(entities=[agent], port=8080, auto_open=True)
+    serve(entities=[agent], port=8080, auto_open=True, instrumentation_enabled=True)
 
 
 if __name__ == "__main__":
