@@ -92,6 +92,7 @@ class HStar:
         self,
         question: str,
         table: Optional[pd.DataFrame] = None,
+        column_desc: Optional[str] = None,
         save_results: bool = True
     ) -> Dict[str, Any]:
         """
@@ -104,6 +105,7 @@ class HStar:
         Args:
             question: Question to answer about the table
             table: Input table as pandas DataFrame (optional if load_data was called)
+            column_desc: Optional description of columns to assist reasoning
             save_results: Whether to save intermediate results
             
         Returns:
@@ -146,7 +148,9 @@ class HStar:
             
             try:
                 # Run stage
-                stage_results = stage.run(db, question, previous_results)
+                if stage_name not in ["COL_TEXT", "COL_SQL"]:
+                    column_desc = None  # Clear column description for text refinement stages
+                stage_results = stage.run(db, question, column_desc, previous_results)
                 
                 # Store results
                 all_results["stages"][stage_name] = stage_results
@@ -195,6 +199,7 @@ class HStar:
         self,
         csv_path: str,
         question: str,
+        column_desc: Optional[str] = None,
         save_results: bool = True
     ) -> Dict[str, Any]:
         """
@@ -206,6 +211,7 @@ class HStar:
         Args:
             csv_path: Path to CSV file
             question: Question to answer
+            column_desc: Optional description of columns to assist reasoning
             save_results: Whether to save results
             
         Returns:
@@ -219,4 +225,4 @@ class HStar:
             else:
                 self.load_data(csv_path=csv_path)
         
-        return self.run(question=question, save_results=save_results)
+        return self.run(question=question, column_desc=column_desc, save_results=save_results)
