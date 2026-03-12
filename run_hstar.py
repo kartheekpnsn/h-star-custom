@@ -16,7 +16,17 @@ def main():
 
     MODEL_NAME = os.environ.get("HSTAR_MODEL_NAME", "gpt-5.1")
     DB_PATH = os.environ.get("HSTAR_DB_PATH", "db/drug_shipments_200.db")
+    COLUMN_DESC_PATH = os.environ.get("HSTAR_COLUMN_DESC_PATH", "data/drug_shipments_200_meta.md")
     DEFAULT_QUESTION = "What are the top 5 drugs by total shipment quantity?"
+
+    # Load the markdown column description if it exists
+    column_desc = None
+    if os.path.exists(COLUMN_DESC_PATH):
+        with open(COLUMN_DESC_PATH, 'r') as f:
+            column_desc = f.read()
+            print(f"Loaded column description from {COLUMN_DESC_PATH}")
+    else:
+        print(f"Warning: Column description file not found at {COLUMN_DESC_PATH}. Continuing without it.")
     
     # Create configuration
     try:
@@ -34,6 +44,7 @@ def main():
 
         results = hstar.run(
             question=DEFAULT_QUESTION,
+            column_desc=column_desc,
             save_results=False  # Set to True to save final results
         )
         
