@@ -33,6 +33,7 @@ class BaseStage(ABC):
         self,
         db: NeuralDB,
         question: str,
+        column_desc: Optional[str] = None,
         previous_results: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
@@ -41,6 +42,7 @@ class BaseStage(ABC):
         Args:
             db: NeuralDB instance with the current table
             question: Question to answer
+            column_desc: Optional description of columns to assist reasoning
             previous_results: Results from previous stages
             
         Returns:

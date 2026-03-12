@@ -20,6 +20,7 @@ class ColTextStage(BaseStage):
         self,
         db: NeuralDB,
         question: str,
+        column_desc: Optional[str] = None,
         previous_results: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
