@@ -1,0 +1,28 @@
+app_name: Agentic-Evals
+version: 1.0.0
+experiment_name: Agentic_Category_evaluation
+evaluation:
+  run_local: True
+  input_path: src/evaluations/offline/agentic_category_evals/datasets/
+  input_file: predicted_categories_response.jsonl
+  output_path: src/evaluations/offline/agentic_category_evals/report/
+  column_mapping:
+    user_id: "${data.conversation_id}"
+  evaluators:
+    custom_agents_category_accuracy_eval: "custom_agents_category_evaluator"
+    relevance_eval: "relevance_evaluator"
+  evaluator_config:
+    custom_agents_category_accuracy_eval:
+      column_mapping:
+        ground_truth_categories: "${data.ground_truth_categories}"
+        predicted_categories: "${data.predicted_categories}"
+    relevance_eval:
+      column_mapping:
+        query: "${data.query}"
+        response: "${data.response}"
+
+
+pipeline:
+  - base_path: evaluator
+    module: eval_main.eval_main
+    config_key: evaluation
