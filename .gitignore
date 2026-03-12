@@ -8,7 +8,7 @@ __pycache__/
 
 # Data
 *.json
-*.jsonl
+
 
 # Distribution / packaging
 .Python
