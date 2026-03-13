@@ -16,12 +16,12 @@ Include only the columns that are necessary to answer the question. Do not inclu
 # Few-shot examples
 EXAMPLES = [
     {
-        "table": """CREATE TABLE dataset (
-  Country TEXT,
-  Capital TEXT,
-  Population INTEGER,
-  Area_sq_km INTEGER,
-  Currency TEXT
+        "table": """CREATE TABLE `dataset` (
+  `Country` STRING,
+  `Capital` STRING,
+  `Population` BIGINT,
+  `Area_sq_km` BIGINT,
+  `Currency` STRING
 );
 
 Sample rows:
@@ -32,12 +32,12 @@ Sample rows:
         "output": "f_col([Country, Population])"
     },
     {
-        "table": """CREATE TABLE dataset (
-  Name TEXT,
-  Age INTEGER,
-  Salary INTEGER,
-  Department TEXT,
-  Join_Date TEXT
+        "table": """CREATE TABLE `dataset` (
+  `Name` STRING,
+  `Age` BIGINT,
+  `Salary` BIGINT,
+  `Department` STRING,
+  `Join_Date` STRING
 );
 
 Sample rows:

@@ -32,7 +32,7 @@ class PromptBuilder:
         Returns:
             Formatted table string
         """
-        df = db.get_table_df()
+        df = db.get_table_df(self.max_rows)
         
         # Truncate if too many rows
         if len(df) > self.max_rows:

@@ -18,9 +18,9 @@ Output ONLY the SQL query without any markdown formatting or explanations."""
 
 EXAMPLES = [
     {
-        "table": """CREATE TABLE dataset (
-  Country TEXT,
-  Population INTEGER
+        "table": """CREATE TABLE `dataset` (
+  `Country` STRING,
+  `Population` BIGINT
 );
 
 Rows:
@@ -29,9 +29,9 @@ Rows:
         "output": "SELECT Population FROM dataset WHERE Country = 'France'"
     },
     {
-        "table": """CREATE TABLE dataset (
-  Country TEXT,
-  Population INTEGER
+        "table": """CREATE TABLE `dataset` (
+  `Country` STRING,
+  `Population` BIGINT
 );
 
 Rows:

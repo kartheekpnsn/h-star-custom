@@ -29,21 +29,28 @@ class Config:
     results_dir: str = "results"
     save_intermediate: bool = True
     
-    # Database settings
-    db_path: str = ":memory:"
+    # Databricks settings
+    server_hostname: str = ""
+    http_path: str = ""
     table_name: str = "dataset"
     
     def __post_init__(self):
         """Load environment variables if not already set."""
-        if not self.azure_endpoint or not self.azure_deployment:
-            load_dotenv()
-            self.azure_endpoint = self.azure_endpoint or os.getenv("AZURE_OPENAI_ENDPOINT", "")
-            self.azure_deployment = self.azure_deployment or os.getenv("AZURE_OPENAI_DEPLOYMENT", "")
-            
+        load_dotenv()
+        self.azure_endpoint = self.azure_endpoint or os.getenv("AZURE_OPENAI_ENDPOINT", "")
+        self.azure_deployment = self.azure_deployment or os.getenv("AZURE_OPENAI_DEPLOYMENT", "")
+        self.server_hostname = self.server_hostname or os.getenv("DATABRICKS_SERVER_HOSTNAME", "")
+        self.http_path = self.http_path or os.getenv("DATABRICKS_HTTP_PATH", "")
+        self.table_name = os.getenv("HSTAR_TABLE_NAME", self.table_name)
+
         if not self.azure_endpoint:
             raise ValueError("AZURE_OPENAI_ENDPOINT must be set in .env or passed to Config")
         if not self.azure_deployment:
             raise ValueError("AZURE_OPENAI_DEPLOYMENT must be set in .env or passed to Config")
+        if not self.server_hostname:
+            raise ValueError("DATABRICKS_SERVER_HOSTNAME must be set in .env or passed to Config")
+        if not self.http_path:
+            raise ValueError("DATABRICKS_HTTP_PATH must be set in .env or passed to Config")
     
     @classmethod
     def from_env(cls, model_name: str="gpt-4o") -> "Config":
@@ -60,4 +67,7 @@ class Config:
             azure_endpoint=os.getenv(f"AZURE_OPENAI_{model_version}_ENDPOINT", ""),
             azure_deployment=os.getenv(f"AZURE_OPENAI_{model_version}_DEPLOYMENT", ""),
             azure_api_version=os.getenv(f"AZURE_OPENAI_{model_version}_API_VERSION", "2024-12-01-preview"),
+            server_hostname=os.getenv("DATABRICKS_SERVER_HOSTNAME", ""),
+            http_path=os.getenv("DATABRICKS_HTTP_PATH", ""),
+            table_name=os.getenv("HSTAR_TABLE_NAME", "dataset"),
         )
