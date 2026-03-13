@@ -8,12 +8,13 @@ from typing import List, Dict, Any, Optional, Tuple
 def extract_f_col(text: str) -> List[str]:
     """
     Extract column names from f_col([...]) format.
+    Supports both unqualified (column) and table-qualified (table.column) names.
     
     Args:
         text: Generated text containing f_col marker
         
     Returns:
-        List of column names
+        List of column names (may include table.column format)
     """
     # Look for f_col([...]) pattern
     pattern = r'f_col\(\[(.*?)\]\)'
@@ -26,6 +27,22 @@ def extract_f_col(text: str) -> List[str]:
         return [col for col in columns if col]  # Filter empty strings
     
     return []
+
+
+def parse_qualified_column(col: str) -> tuple:
+    """
+    Split a potentially table-qualified column name.
+
+    Args:
+        col: Column name, optionally table-qualified (e.g., "table.column")
+
+    Returns:
+        Tuple of (table_name_or_None, column_name)
+    """
+    if "." in col:
+        parts = col.rsplit(".", 1)
+        return (parts[0], parts[1])
+    return (None, col)
 
 
 def extract_f_row(text: str) -> List[int]:

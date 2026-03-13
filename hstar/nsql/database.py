@@ -19,12 +19,14 @@ class NeuralDB:
     """
     Neural SQL database wrapper that queries tables in Databricks.
     Provides query execution and result extraction capabilities.
+    Supports single-table and multi-table (JOIN) modes.
     """
 
     def __init__(
         self,
         connection: databricks_sql.client.Connection,
         table_name: str = "dataset",
+        table_names: list[str] | None = None,
     ):
         """
         Initialize NeuralDB with a Databricks SQL connection.
@@ -32,14 +34,49 @@ class NeuralDB:
         Args:
             connection: Pre-established Databricks SQL connection
             table_name: Fully qualified table name (catalog.schema.table)
+            table_names: List of fully qualified table names for multi-table mode
         """
         self.table_name = table_name
+        self.table_names = table_names or [table_name]
         self._connection = connection
         self._cursor = connection.cursor()
         self._current_view = table_name
         self._column_cache: list[dict[str, str]] | None = None
+        self._column_caches: dict[str, list[dict[str, str]]] = {}
         # Short name for temporary views (Spark requires single-part names)
         self._short_name = table_name.rsplit(".", 1)[-1]
+
+    @property
+    def is_multi_table(self) -> bool:
+        """Whether the database is configured for multi-table mode."""
+        return len(self.table_names) > 1
+
+    @staticmethod
+    def discover_tables(
+        cursor,
+        schema: str,
+    ) -> List[str]:
+        """Discover all tables in a Databricks catalog.schema.
+
+        Runs ``SHOW TABLES IN <schema>`` and returns fully qualified
+        table names (``catalog.schema.table``).
+
+        Args:
+            cursor: Active Databricks SQL cursor.
+            schema: Fully qualified schema name (e.g. ``hive_metastore.piiq``).
+
+        Returns:
+            Sorted list of fully qualified table names.
+        """
+        cursor.execute(f"SHOW TABLES IN {schema}")
+        rows = cursor.fetchall()
+        # SHOW TABLES returns (database, tableName, isTemporary)
+        tables = [
+            f"{schema}.{row[1]}"
+            for row in rows
+            if not row[2]  # exclude temporary tables/views
+        ]
+        return sorted(tables)
 
     def _invalidate_cache(self) -> None:
         """Invalidate the column cache."""
@@ -76,6 +113,52 @@ class NeuralDB:
         """Get list of column names."""
         columns = self._describe_table()
         return [col["name"] for col in columns]
+
+    def _describe_named_table(self, name: str) -> list[dict[str, str]]:
+        """Get column metadata for a specific table, with caching."""
+        if name in self._column_caches:
+            return self._column_caches[name]
+
+        self._cursor.execute(f"DESCRIBE TABLE {name}")
+        rows = self._cursor.fetchall()
+
+        cols = [
+            {"name": row[0], "type": row[1], "comment": row[2] or ""}
+            for row in rows
+            if not str(row[0]).startswith("#")
+        ]
+        self._column_caches[name] = cols
+        return cols
+
+    def get_create_table_sql_for(self, name: str) -> str:
+        """Get CREATE TABLE statement for a specific table."""
+        columns = self._describe_named_table(name)
+        col_defs = [f"  `{col['name']}` {col['type']}" for col in columns]
+        return f"CREATE TABLE `{name}` (\n" + ",\n".join(col_defs) + "\n);"
+
+    def get_all_create_table_sql(self) -> str:
+        """Get CREATE TABLE statements for all tables, separated by blank lines."""
+        return "\n\n".join(
+            self.get_create_table_sql_for(name) for name in self.table_names
+        )
+
+    def get_all_column_names(self) -> Dict[str, List[str]]:
+        """Get column names for all tables as {table_name: [col_names]}."""
+        return {
+            name: [col["name"] for col in self._describe_named_table(name)]
+            for name in self.table_names
+        }
+
+    def get_sample_rows(self, name: str, limit: int = 5) -> tuple[List[str], List[list]]:
+        """Get sample rows from a specific table.
+
+        Returns:
+            Tuple of (column_names, rows)
+        """
+        self._cursor.execute(f"SELECT * FROM {name} LIMIT {int(limit)}")
+        rows = self._cursor.fetchall()
+        columns = [desc[0] for desc in self._cursor.description]
+        return columns, [list(r) for r in rows]
 
     def execute_query(self, query: str) -> Dict[str, Any]:
         """

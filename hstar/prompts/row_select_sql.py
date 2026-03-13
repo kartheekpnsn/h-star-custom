@@ -1,15 +1,17 @@
 """Prompt template for SQL-based row selection.
 
-This stage generates SQL queries to extract relevant rows from the table.
-Output format: f_row([row_id1, row_id2, ...]) based on SQL execution
+This stage generates SQL queries to extract relevant rows from the table(s).
+Supports multi-table schemas with JOIN queries.
+Output format: SQL query
 """
 
-SYSTEM_MESSAGE = "You are an expert SQL query writer for extracting relevant data from tables."
+SYSTEM_MESSAGE = "You are an expert SQL query writer for extracting relevant data from tables. You can write queries that span multiple tables using JOINs."
 
-INSTRUCTION = """Your task is to write a SQL query to extract the rows from the table that are relevant to answer the question.
+INSTRUCTION = """Your task is to write a SQL query to extract the rows from the table(s) that are relevant to answer the question.
 
 Analyze the question and write a SELECT query to retrieve the relevant rows.
 Focus on filtering rows using WHERE clauses when appropriate.
+When multiple tables are provided, use JOIN clauses to combine data across tables.
 
 Output ONLY the SQL query without any markdown formatting or explanations."""
 
@@ -28,17 +30,29 @@ Sample rows:
         "output": "SELECT * FROM dataset WHERE Country = 'France'"
     },
     {
-        "table": """CREATE TABLE `dataset` (
-  `Name` STRING,
-  `Department` STRING,
-  `Salary` BIGINT
+        "table": """CREATE TABLE `orders` (
+  `order_id` BIGINT,
+  `customer_id` BIGINT,
+  `product_id` BIGINT,
+  `quantity` BIGINT,
+  `order_date` STRING
 );
 
 Sample rows:
-  ('Alice Smith', 'Engineering', 75000)
-  ('Bob Johnson', 'Sales', 95000)
-  ('Carol White', 'Engineering', 68000)""",
-        "question": "Who works in Engineering and earns more than 70000?",
-        "output": "SELECT * FROM dataset WHERE Department = 'Engineering' AND Salary > 70000"
+  (1, 101, 501, 3, '2024-01-15')
+  (2, 102, 502, 1, '2024-01-16')
+
+CREATE TABLE `customers` (
+  `customer_id` BIGINT,
+  `name` STRING,
+  `city` STRING,
+  `country` STRING
+);
+
+Sample rows:
+  (101, 'Alice', 'New York', 'USA')
+  (102, 'Bob', 'London', 'UK')""",
+        "question": "Which customers from the USA placed orders?",
+        "output": "SELECT c.name, o.order_id, o.order_date FROM orders o JOIN customers c ON o.customer_id = c.customer_id WHERE c.country = 'USA'"
     }
 ]

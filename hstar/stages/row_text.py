@@ -84,8 +84,9 @@ class RowTextStage(BaseStage):
         
         self.log(f"Refined to {len(refined_rows)} rows")
         
-        # Update database with refined rows
-        if refined_rows:
+        # Update database with refined rows (single-table mode only).
+        # In multi-table mode, the table state is not mutated.
+        if refined_rows and not db.is_multi_table:
             import pandas as pd
             df = pd.DataFrame(refined_rows, columns=columns)
             db.update_table(df)

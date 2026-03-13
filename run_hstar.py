@@ -16,6 +16,8 @@ def main():
 
     MODEL_NAME = os.environ.get("HSTAR_MODEL_NAME", "gpt-5.1")
     TABLE_NAME = os.environ.get("HSTAR_TABLE_NAME", "dataset")
+    TABLE_NAMES = os.environ.get("HSTAR_TABLE_NAMES", "")
+    SCHEMA = os.environ.get("HSTAR_SCHEMA", "")
     COLUMN_DESC_PATH = os.environ.get("HSTAR_COLUMN_DESC_PATH", "data/drug_shipments_200_meta.md")
     DEFAULT_QUESTION = "What are the top 5 drugs by total shipment quantity?"
 

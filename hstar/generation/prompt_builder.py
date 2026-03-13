@@ -24,14 +24,18 @@ class PromptBuilder:
     
     def format_table(self, db: NeuralDB) -> str:
         """
-        Format table according to prompt style.
+        Format table(s) according to prompt style.
+        Delegates to format_tables() in multi-table mode.
         
         Args:
-            db: NeuralDB instance containing the table
+            db: NeuralDB instance containing the table(s)
             
         Returns:
             Formatted table string
         """
+        if db.is_multi_table:
+            return self.format_tables(db)
+
         df = db.get_table_df(self.max_rows)
         
         # Truncate if too many rows
@@ -46,6 +50,29 @@ class PromptBuilder:
             return self._format_text(df)
         else:
             return self._format_create_table(db, df)
+
+    def format_tables(self, db: NeuralDB) -> str:
+        """
+        Format all table schemas for multi-table mode.
+
+        Args:
+            db: NeuralDB instance configured with multiple tables
+
+        Returns:
+            Combined schema string with CREATE TABLE + sample rows for each table
+        """
+        parts: list[str] = []
+        for name in db.table_names:
+            ddl = db.get_create_table_sql_for(name)
+            section = ddl + "\n\nSample rows:\n"
+            cols, rows = db.get_sample_rows(name, limit=5)
+            for row in rows:
+                values = ", ".join(
+                    f"'{str(v)}'" if isinstance(v, str) else str(v) for v in row
+                )
+                section += f"  ({values})\n"
+            parts.append(section)
+        return "\n\n".join(parts)
     
     def _format_create_table(self, db: NeuralDB, df: pd.DataFrame) -> str:
         """Format as SQL CREATE TABLE with sample rows."""

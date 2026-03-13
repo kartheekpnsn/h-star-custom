@@ -34,9 +34,15 @@ class ColTextStage(BaseStage):
         # Get preliminary columns from previous stage
         preliminary_cols = previous_results.get("columns", db.get_column_names())
         
-        # Build context
-        all_columns = db.get_column_names()
-        context = f"All available columns: {', '.join(all_columns)}\n"
+        # Build context — show columns from all tables in multi-table mode
+        if db.is_multi_table:
+            all_cols_map = db.get_all_column_names()
+            context = "All available columns:\n"
+            for tname, cols in all_cols_map.items():
+                context += f"  {tname}: {', '.join(cols)}\n"
+        else:
+            all_columns = db.get_column_names()
+            context = f"All available columns: {', '.join(all_columns)}\n"
         context += f"Preliminary selection: {', '.join(preliminary_cols)}"
         
         # Build prompt

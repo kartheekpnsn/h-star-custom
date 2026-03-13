@@ -2,16 +2,21 @@
 
 This stage identifies which columns are relevant to answer the question.
 Output format: f_col([column1, column2, ...])
+Supports multi-table schemas with table-qualified column names.
 """
 
-SYSTEM_MESSAGE = "You are an expert at analyzing tables and identifying relevant columns for answering questions."
+SYSTEM_MESSAGE = "You are an expert at analyzing table schemas and identifying relevant columns for answering questions. You can work with single tables or multiple tables that may require JOINs."
 
-INSTRUCTION = """Your task is to identify which columns from the table are relevant to answer the given question.
+INSTRUCTION = """Your task is to identify which columns from the table(s) are relevant to answer the given question.
 
-Analyze the question and the table schema, then output ONLY the relevant column names in this exact format:
+Analyze the question and the table schema(s), then output ONLY the relevant column names in this exact format:
 f_col([column1, column2, ...])
 
-Include only the columns that are necessary to answer the question. Do not include unnecessary columns."""
+When multiple tables are provided, use table-qualified column names:
+f_col([table_name.column1, table_name.column2, other_table.column3])
+
+Include only the columns that are necessary to answer the question. Do not include unnecessary columns.
+If the question requires data from multiple tables, include the JOIN key columns as well."""
 
 # Few-shot examples
 EXAMPLES = [
@@ -32,19 +37,40 @@ Sample rows:
         "output": "f_col([Country, Population])"
     },
     {
-        "table": """CREATE TABLE `dataset` (
-  `Name` STRING,
-  `Age` BIGINT,
-  `Salary` BIGINT,
-  `Department` STRING,
-  `Join_Date` STRING
+        "table": """CREATE TABLE `orders` (
+  `order_id` BIGINT,
+  `customer_id` BIGINT,
+  `product_id` BIGINT,
+  `quantity` BIGINT,
+  `order_date` STRING
 );
 
 Sample rows:
-  ('Alice Smith', 32, 75000, 'Engineering', '2019-03-15')
-  ('Bob Johnson', 45, 95000, 'Sales', '2015-07-22')
-  ('Carol White', 28, 68000, 'Marketing', '2020-11-03')""",
-        "question": "Who works in the Engineering department?",
-        "output": "f_col([Name, Department])"
+  (1, 101, 501, 3, '2024-01-15')
+  (2, 102, 502, 1, '2024-01-16')
+
+CREATE TABLE `customers` (
+  `customer_id` BIGINT,
+  `name` STRING,
+  `city` STRING,
+  `country` STRING
+);
+
+Sample rows:
+  (101, 'Alice', 'New York', 'USA')
+  (102, 'Bob', 'London', 'UK')
+
+CREATE TABLE `products` (
+  `product_id` BIGINT,
+  `product_name` STRING,
+  `category` STRING,
+  `price` DOUBLE
+);
+
+Sample rows:
+  (501, 'Laptop', 'Electronics', 999.99)
+  (502, 'Book', 'Education', 29.99)""",
+        "question": "What products did customers from the USA order?",
+        "output": "f_col([orders.customer_id, orders.product_id, customers.customer_id, customers.name, customers.country, products.product_id, products.product_name])"
     }
 ]

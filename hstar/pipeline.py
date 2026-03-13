@@ -69,6 +69,10 @@ class HStar:
         """
         Establish a Databricks SQL connection via Azure AD token.
 
+        When ``HSTAR_SCHEMA`` is configured and no explicit
+        ``HSTAR_TABLE_NAMES`` override exists, auto-discovers all
+        tables in the schema and populates ``config.table_names``.
+
         The connection is stored internally and reused by subsequent
         ``run()`` calls.
         """
@@ -80,6 +84,30 @@ class HStar:
             access_token=token.token,
         )
         print(f"Connected to Databricks: {self.config.server_hostname}")
+
+        # Schema auto-discovery: populate table_names when a schema is
+        # configured and the user didn't supply an explicit table list.
+        if self.config.schema and not os.getenv("HSTAR_TABLE_NAMES"):
+            cursor = self._connection.cursor()
+            try:
+                discovered = NeuralDB.discover_tables(
+                    cursor, self.config.schema
+                )
+            finally:
+                cursor.close()
+
+            if discovered:
+                self.config.table_names = discovered
+                print(
+                    f"Discovered {len(discovered)} tables in "
+                    f"{self.config.schema}: "
+                    f"{', '.join(discovered)}"
+                )
+            else:
+                print(
+                    f"Warning: No tables found in schema "
+                    f"{self.config.schema}"
+                )
 
     def run(
         self,
@@ -110,12 +138,16 @@ class HStar:
         print("H-STAR PIPELINE EXECUTION")
         print("="*60)
         print(f"Question: {question}")
-        print(f"Table: {self.config.table_name}")
+        if len(self.config.table_names) > 1:
+            print(f"Tables: {', '.join(self.config.table_names)}")
+        else:
+            print(f"Table: {self.config.table_name}")
         print("="*60 + "\n")
 
         db = NeuralDB(
             connection=self._connection,
             table_name=self.config.table_name,
+            table_names=self.config.table_names,
         )
 
         # Execute stages sequentially

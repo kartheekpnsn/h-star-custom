@@ -31,8 +31,9 @@ class RowSQLStage(BaseStage):
         """
         self.log("Selecting relevant rows using SQL generation...")
         
-        # First, filter database to selected columns if available
-        if previous_results and "columns" in previous_results:
+        # Filter database to selected columns (single-table mode only).
+        # In multi-table mode, column filtering is handled in the SQL query itself.
+        if not db.is_multi_table and previous_results and "columns" in previous_results:
             selected_cols = previous_results["columns"]
             self.log(f"Filtering to columns: {selected_cols}")
             db.filter_columns(selected_cols)

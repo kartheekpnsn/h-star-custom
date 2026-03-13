@@ -1,13 +1,15 @@
 """Prompt template for text-based row selection refinement.
 
 This stage refines row selection using natural language reasoning.
+Supports results from single-table or multi-table JOIN queries.
 Output format: refined list of row indices or confirmation
 """
 
-SYSTEM_MESSAGE = "You are an expert at analyzing query results and determining their relevance."
+SYSTEM_MESSAGE = "You are an expert at analyzing query results and determining their relevance. You can work with results from single tables or JOIN queries across multiple tables."
 
 INSTRUCTION = """You are given a table, a question, and SQL query results showing selected rows.
 Your task is to review these rows and confirm they are relevant to answer the question.
+The results may come from a single table or from a JOIN across multiple tables.
 
 Analyze the rows and indicate if they are sufficient and correct for answering the question.
 If rows need adjustment, specify which rows should be kept.
@@ -26,10 +28,10 @@ EXAMPLES = [
     },
     {
         "table": """Rows:
-0: Alice Smith, Engineering, 75000
-1: Carol White, Engineering, 68000
-2: David Brown, Engineering, 85000""",
-        "question": "Who works in Engineering and earns more than 70000?",
-        "output": "Row indices: 0, 2"
+0: Alice, USA, Laptop, 3, 999.99
+1: Alice, USA, Book, 1, 29.99
+2: Bob, UK, Laptop, 2, 999.99""",
+        "question": "What products did customers from the USA order?",
+        "output": "Row indices: 0, 1"
     }
 ]
