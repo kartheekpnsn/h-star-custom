@@ -161,9 +161,13 @@ class HStar:
                 # Continue to next stage with error noted
                 continue
         
-        # Extract final answer
+        # Extract final answer and SQL result data for presentation
         final_stage = all_results["stages"].get("REASON_TEXT", {})
         all_results["final_answer"] = final_stage.get("final_answer", "No answer generated")
+        all_results["sql_result"] = final_stage.get("sql_result", [])
+        all_results["result_columns"] = final_stage.get("result_columns", [])
+        all_results["sql_query"] = final_stage.get("sql_query")
+        all_results["row_count"] = final_stage.get("row_count", 0)
         
         print("\n" + "="*60)
         print("PIPELINE COMPLETE")

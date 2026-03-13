@@ -4,6 +4,7 @@ from typing import Dict, Any, Optional
 from hstar.stages.base import BaseStage
 from hstar.nsql.database import NeuralDB
 from hstar.prompts import text_reason
+from hstar.utils import format_sql_results
 
 
 class ReasonTextStage(BaseStage):
@@ -33,13 +34,18 @@ class ReasonTextStage(BaseStage):
         # Get SQL result from previous stage
         sql_result = None
         sql_query = None
+        result_columns = []
         if previous_results:
             sql_result = previous_results.get("sql_result")
             sql_query = previous_results.get("sql_query")
+            result_columns = previous_results.get("result_columns", [])
         
-        # Format context
+        # Format context with all result rows
         context = f"SQL Query Executed: {sql_query}\n"
-        context += f"SQL Result: {sql_result}\n"
+        if isinstance(sql_result, list) and result_columns:
+            context += f"SQL Result:\n{format_sql_results(result_columns, sql_result)}\n"
+        else:
+            context += f"SQL Result: {sql_result}\n"
         
         # Get table summary
         table_str = self.prompt_builder.format_table(db)
@@ -75,5 +81,7 @@ class ReasonTextStage(BaseStage):
             "raw_output": response,
             "sql_result": sql_result,
             "sql_query": sql_query,
+            "result_columns": result_columns,
+            "row_count": len(sql_result) if isinstance(sql_result, list) else 0,
             "stage": self.get_stage_name()
         }

@@ -67,15 +67,16 @@ class ReasonSQLStage(BaseStage):
                 "stage": self.get_stage_name()
             }
         
-        # Extract the result value
-        sql_result = result["rows"][0] if result["rows"] else None
+        # Return all result rows
+        sql_result = result["rows"] if result["rows"] else []
         
-        self.log(f"SQL result: {sql_result}")
+        self.log(f"SQL result ({result['row_count']} rows): {sql_result}")
         
         return {
             "sql_query": sql_query,
             "sql_result": sql_result,
             "result_columns": result["header"],
+            "row_count": result["row_count"],
             "raw_output": response,
             "stage": self.get_stage_name()
         }
