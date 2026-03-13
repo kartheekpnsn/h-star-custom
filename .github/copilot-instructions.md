@@ -2,7 +2,7 @@
 
 ## Project overview
 
-**H-STAR** (Hybrid SQL-Text Adaptive Reasoning) is a 6-stage LLM pipeline that answers natural-language questions about tabular data by alternating SQL-based and text-based reasoning stages. The pipeline works on CSV or SQLite datasets, using Azure OpenAI models with `DefaultAzureCredential` (no API keys).
+**H-STAR** (Hybrid SQL-Text Adaptive Reasoning) is a 6-stage LLM pipeline that answers natural-language questions about tabular data by alternating SQL-based and text-based reasoning stages. The pipeline queries tables in **Databricks SQL** (via the `databricks-sql-connector`) and uses **Azure OpenAI** models with `DefaultAzureCredential` (no API keys). It supports both single-table and multi-table (JOIN) queries, with automatic schema discovery and relationship detection.
 
 ## Quick reference
 
@@ -12,8 +12,6 @@
 | Run pipeline CLI | `uv run hstar` or `uv run python run_hstar.py` |
 | Run H-STAR agent | `uv run python -m agents.hstar-agent.starter` |
 | Run MQA agent | `uv run python -m agents.mqa-agent.starter` |
-| Convert CSV to SQLite | `uv run python hstar/sqlite/csv_to_sqlite.py data/<file>.csv` |
-| Verify SQLite DB | `uv run python hstar/sqlite/verify_db.py db/<file>.db` |
 
 No test suite exists yet. Validation is manual via pipeline runs.
 
@@ -22,7 +20,7 @@ No test suite exists yet. Validation is manual via pipeline runs.
 ### Pipeline stages (executed in order)
 
 ```text
-Question + Table → COL_SQL → COL_TEXT → ROW_SQL → ROW_TEXT → REASON_SQL → REASON_TEXT → Answer
+Question + Table(s) → COL_SQL → COL_TEXT → ROW_SQL → ROW_TEXT → REASON_SQL → REASON_TEXT → Answer
 ```
 
 | # | Stage | Class | Purpose |
@@ -34,6 +32,8 @@ Question + Table → COL_SQL → COL_TEXT → ROW_SQL → ROW_TEXT → REASON_SQ
 | 5 | REASON_SQL | `ReasonSQLStage` | Generate final analytical SQL query |
 | 6 | REASON_TEXT | `ReasonTextStage` | Synthesize natural-language answer |
 
+In multi-table mode, column/row filtering stages skip per-table mutation and instead let SQL stages handle filtering via JOIN queries.
+
 ### Key modules
 
 ```text
@@ -44,7 +44,7 @@ hstar/
     generator.py       # Generator — Azure OpenAI wrapper with retry
     prompt_builder.py  # PromptBuilder — table formatting + few-shot assembly
   nsql/
-    database.py        # NeuralDB — SQLite wrapper, column/row filtering
+    database.py        # NeuralDB — Databricks SQL wrapper, multi-table support
   stages/
     base.py            # BaseStage ABC — run(), get_stage_name()
     col_sql.py … reason_text.py  # One file per stage
@@ -53,7 +53,7 @@ hstar/
   utils/
     __init__.py        # Extraction helpers (extract_f_col, extract_sql_query, etc.)
   sqlite/
-    csv_to_sqlite.py   # CSV→SQLite converter
+    csv_to_sqlite.py   # Legacy CSV→SQLite converter (not used with Databricks)
 agents/
   hstar-agent/starter.py   # Agent Framework wrapper around full pipeline
   mqa-agent/starter.py     # Multi-query agent for query expansion
@@ -62,10 +62,20 @@ agents/
 
 ### Data flow
 
-1. **Load**: `HStar.load_data()` reads CSV or SQLite into a DataFrame (cached).
-2. **Per run**: A fresh in-memory `NeuralDB` copy is created (source is immutable).
-3. **Each stage**: Formats the current table state → prompts the LLM → extracts structured output → optionally updates `NeuralDB`.
+1. **Connect**: `HStar.load_data()` establishes a Databricks SQL connection via Azure AD token authentication. When `HSTAR_SCHEMA` is configured, it auto-discovers all tables in the schema.
+2. **Per run**: A `NeuralDB` instance is created with the connection and table name(s). In multi-table mode, it detects relationships (candidate JOIN keys) across tables by matching column names and types.
+3. **Each stage**: Formats table schema(s) and relationship hints → prompts the LLM → extracts structured output → optionally updates the query context.
 4. **Result**: `previous_results` dict chains through all stages; final answer in `results['final_answer']`.
+
+### Multi-table support
+
+The pipeline supports querying across multiple tables with JOINs:
+
+- **Table resolution priority**: explicit `HSTAR_TABLE_NAMES` → schema auto-discovery via `HSTAR_SCHEMA` → single `HSTAR_TABLE_NAME`.
+- **Schema auto-discovery**: `NeuralDB.discover_tables()` runs `SHOW TABLES IN <schema>` against Databricks to find all available tables.
+- **Relationship detection**: `NeuralDB.detect_relationships()` compares columns across all table pairs by name and type, identifying candidate JOIN keys. Compatible types (exact match or both numeric) are treated as joinable.
+- **Relationship hints**: `NeuralDB.get_relationship_hints()` formats detected relationships as text (e.g., `left.col → right.col`) and `PromptBuilder.format_tables()` appends them after the CREATE TABLE schemas so the LLM can generate correct JOIN conditions.
+- **Column references**: In multi-table mode, `extract_f_col()` and `parse_qualified_column()` handle `table.column` qualified names.
 
 ## Conventions
 
@@ -88,6 +98,8 @@ EXAMPLES = [
 ]
 ```
 
+SQL prompt INSTRUCTIONs reference relationship hints for JOIN key guidance.
+
 ### Adding a new stage
 
 1. Create `hstar/stages/<name>.py` inheriting `BaseStage`.
@@ -108,8 +120,23 @@ EXAMPLES = [
 AZURE_OPENAI_ENDPOINT=           # Azure OpenAI resource URL
 AZURE_OPENAI_DEPLOYMENT=         # Model deployment name
 AZURE_OPENAI_API_VERSION=        # API version (e.g. 2024-12-01-preview)
-HSTAR_MODEL_NAME=                # Model name for Config (e.g. gpt-5.1)
-HSTAR_DB_PATH=                   # SQLite DB path (e.g. db/drug_shipments_200.db)
+HSTAR_MODEL_NAME=                # Model name for Config (e.g. gpt-5.4)
+DATABRICKS_SERVER_HOSTNAME=      # Databricks workspace hostname
+DATABRICKS_HTTP_PATH=            # Databricks SQL warehouse HTTP path
+```
+
+### Table configuration (choose one)
+
+```bash
+HSTAR_TABLE_NAME=                # Single fully qualified table (catalog.schema.table)
+HSTAR_TABLE_NAMES=               # Comma-separated list of fully qualified table names
+HSTAR_SCHEMA=                    # catalog.schema for auto-discovery (e.g. hive_metastore.piiq)
+```
+
+### Optional variables
+
+```bash
+HSTAR_COLUMN_DESC_PATH=          # Path to column description markdown (default: data/drug_shipments_200_meta.md)
 ```
 
 ### Agent Framework variables (for agents only)
@@ -121,15 +148,17 @@ AZURE_OPENAI_RESPONSES_DEPLOYMENT_NAME=       # Responses API deployment
 
 ### Authentication
 
-All Azure calls use `DefaultAzureCredential`. Ensure you are logged in via `az login` or have a managed identity configured.
+All Azure calls use `DefaultAzureCredential`. Databricks connections use Azure AD token authentication (scope `2ff814a6-3304-4ab8-85cb-cd0e6f879c1d/.default`). Ensure you are logged in via `az login` or have a managed identity configured.
 
 ## Domain context
 
-The primary dataset is a pharmaceutical drug-shipment table (`drug_shipments_200.csv`) with columns covering patient info, prescriber details, payer/insurance data, drug identifiers (NDC), shipment dates, and financial assistance flags. Column descriptions live in `data/drug_shipments_200_meta.md`.
+The primary dataset consists of tables in a Databricks Hive Metastore schema (e.g., `hive_metastore.piiq`). The pipeline auto-discovers all tables when `HSTAR_SCHEMA` is set. Column descriptions can be provided via a markdown file at `HSTAR_COLUMN_DESC_PATH`.
 
 ## Pitfalls
 
 - **uv prerelease**: `agent-framework==1.0.0rc2` requires `[tool.uv] prerelease = "allow"` in `pyproject.toml`.
-- **DB path**: The pipeline expects a pre-built SQLite DB at the `HSTAR_DB_PATH` path. Run `csv_to_sqlite.py` first if missing.
-- **In-memory DB**: Each `run()` call copies the source table to `:memory:` — large tables increase memory usage.
+- **Databricks connection**: Requires `DATABRICKS_SERVER_HOSTNAME` and `DATABRICKS_HTTP_PATH` environment variables. The connection uses Azure AD tokens, not personal access tokens.
+- **Schema discovery**: When `HSTAR_SCHEMA` is set and `HSTAR_TABLE_NAMES` is not, the pipeline discovers tables at connection time. Ensure the schema path is correct (e.g., `hive_metastore.piiq`).
+- **No formal FKs**: Hive Metastore does not enforce foreign key constraints. Relationship detection uses a name-and-type matching heuristic — columns with the same name and compatible types across tables are treated as candidate JOIN keys.
+- **Multi-table filtering**: In multi-table mode, column and row filtering stages skip per-table mutation. The SQL reasoning stages handle filtering via JOIN queries.
 - **Prompt style**: The `Config.prompt_style` setting (`create_table`, `transpose`, `text`) changes how tables appear in LLM prompts; default is `create_table`.

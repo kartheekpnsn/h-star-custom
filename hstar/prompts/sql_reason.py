@@ -16,6 +16,8 @@ The query might involve:
 - String operations for text-based questions
 - JOINs across multiple tables when the question requires data from different tables
 
+When relationship hints are provided, use the suggested JOIN keys to write correct JOIN conditions.
+
 Output ONLY the SQL query without any markdown formatting or explanations."""
 
 EXAMPLES = [

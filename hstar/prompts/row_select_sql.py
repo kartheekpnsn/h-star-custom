@@ -12,6 +12,7 @@ INSTRUCTION = """Your task is to write a SQL query to extract the rows from the 
 Analyze the question and write a SELECT query to retrieve the relevant rows.
 Focus on filtering rows using WHERE clauses when appropriate.
 When multiple tables are provided, use JOIN clauses to combine data across tables.
+When relationship hints are provided, use the suggested JOIN keys to write correct JOIN conditions.
 
 Output ONLY the SQL query without any markdown formatting or explanations."""
 

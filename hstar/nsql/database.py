@@ -43,6 +43,7 @@ class NeuralDB:
         self._current_view = table_name
         self._column_cache: list[dict[str, str]] | None = None
         self._column_caches: dict[str, list[dict[str, str]]] = {}
+        self._relationships: list[dict[str, str]] | None = None
         # Short name for temporary views (Spark requires single-part names)
         self._short_name = table_name.rsplit(".", 1)[-1]
 
@@ -159,6 +160,78 @@ class NeuralDB:
         rows = self._cursor.fetchall()
         columns = [desc[0] for desc in self._cursor.description]
         return columns, [list(r) for r in rows]
+
+    def detect_relationships(self) -> list[dict[str, str]]:
+        """Detect likely JOIN relationships across tables by matching column names and types.
+
+        Compares columns across all table pairs. Columns that share the
+        same name **and** compatible types are treated as candidate join
+        keys.  Results are cached after the first call.
+
+        Returns:
+            List of relationship dicts, each with keys:
+            ``left_table``, ``left_column``, ``right_table``,
+            ``right_column``, ``join_type``.
+        """
+        if self._relationships is not None:
+            return self._relationships
+
+        if not self.is_multi_table:
+            self._relationships = []
+            return self._relationships
+
+        # Build {table: {col_name: col_type}} map
+        table_cols: dict[str, dict[str, str]] = {}
+        for name in self.table_names:
+            cols = self._describe_named_table(name)
+            table_cols[name] = {c["name"].lower(): c["type"].upper() for c in cols}
+
+        relationships: list[dict[str, str]] = []
+        names = list(table_cols.keys())
+        for i, left in enumerate(names):
+            for right in names[i + 1:]:
+                shared = set(table_cols[left].keys()) & set(table_cols[right].keys())
+                for col in sorted(shared):
+                    # Require compatible types (exact match or both numeric)
+                    lt = table_cols[left][col]
+                    rt = table_cols[right][col]
+                    numeric = {"BIGINT", "INT", "SMALLINT", "TINYINT", "DOUBLE", "FLOAT", "DECIMAL"}
+                    if lt == rt or (lt in numeric and rt in numeric):
+                        # Recover original-case column name from the left table
+                        orig_name = col
+                        for c in self._describe_named_table(left):
+                            if c["name"].lower() == col:
+                                orig_name = c["name"]
+                                break
+                        relationships.append({
+                            "left_table": left,
+                            "left_column": orig_name,
+                            "right_table": right,
+                            "right_column": orig_name,
+                            "join_type": "INNER JOIN",
+                        })
+
+        self._relationships = relationships
+        return self._relationships
+
+    def get_relationship_hints(self) -> str:
+        """Format detected relationships as a text block for LLM prompts.
+
+        Returns:
+            Human-readable relationship hints, or empty string when
+            there are no relationships (single-table mode).
+        """
+        rels = self.detect_relationships()
+        if not rels:
+            return ""
+
+        lines = ["Detected table relationships (suggested JOIN keys):"]
+        for r in rels:
+            lines.append(
+                f"  {r['left_table']}.{r['left_column']} → "
+                f"{r['right_table']}.{r['right_column']}"
+            )
+        return "\n".join(lines)
 
     def execute_query(self, query: str) -> Dict[str, Any]:
         """

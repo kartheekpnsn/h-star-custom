@@ -16,7 +16,8 @@ When multiple tables are provided, use table-qualified column names:
 f_col([table_name.column1, table_name.column2, other_table.column3])
 
 Include only the columns that are necessary to answer the question. Do not include unnecessary columns.
-If the question requires data from multiple tables, include the JOIN key columns as well."""
+If the question requires data from multiple tables, include the JOIN key columns as well.
+When relationship hints are provided, use them to identify the correct JOIN key columns."""
 
 # Few-shot examples
 EXAMPLES = [

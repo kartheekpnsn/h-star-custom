@@ -54,6 +54,7 @@ class PromptBuilder:
     def format_tables(self, db: NeuralDB) -> str:
         """
         Format all table schemas for multi-table mode.
+        Includes relationship hints when detected.
 
         Args:
             db: NeuralDB instance configured with multiple tables
@@ -72,7 +73,15 @@ class PromptBuilder:
                 )
                 section += f"  ({values})\n"
             parts.append(section)
-        return "\n\n".join(parts)
+
+        result = "\n\n".join(parts)
+
+        # Append relationship hints so the LLM knows which columns to JOIN on
+        hints = db.get_relationship_hints()
+        if hints:
+            result += "\n\n" + hints
+
+        return result
     
     def _format_create_table(self, db: NeuralDB, df: pd.DataFrame) -> str:
         """Format as SQL CREATE TABLE with sample rows."""
